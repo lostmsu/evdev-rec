@@ -1,0 +1,13 @@
+[Unit]
+Description=Stop/Start evdev capture around sleep
+Before=sleep.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/systemctl stop capture-evdev.service
+ExecStop=/usr/bin/systemctl start capture-evdev.service
+
+[Install]
+WantedBy=sleep.target
+

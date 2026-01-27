@@ -1,0 +1,13 @@
+<Solution>
+    <Folder Name="/Repo/">
+        <File Path="README.md" />
+        <File Path=".gitattributes" />
+        <File Path=".gitignore" />
+        <File Path="LICENSE" />
+    </Folder>
+    <Folder Name="/systemd/">
+        <File Path="systemd\capture-evdev.service" />
+        <File Path="systemd\capture-evdev.sleep-hook.service" />
+    </Folder>
+    <Project Path="app/evdev-rec.csproj" />
+</Solution>

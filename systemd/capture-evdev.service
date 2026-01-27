@@ -1,0 +1,16 @@
+[Unit]
+Description=Capture evdev
+After=local-fs.target
+
+[Service]
+Type=notify
+# Adjust paths as needed.
+ExecStart=/usr/bin/dotnet evdev-rec.dll --output /var/lib/evdev-capture
+Restart=always
+RestartSec=2
+
+# Needs access to /dev/input/event*
+# Consider: Group=input (or run as root) on most distros.
+
+[Install]
+WantedBy=multi-user.target
