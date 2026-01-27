@@ -11,11 +11,14 @@ public struct input_event {
 
 public struct timeval {
     public long tv_sec;
+    /// <summary>
+    /// Microseconds
+    /// </summary>
     public long tv_usec;
 
     public static implicit operator TimeSpan(timeval value)
         => new(checked(value.tv_sec * TimeSpan.TicksPerSecond
-                     + value.tv_usec * (TimeSpan.TicksPerMillisecond / 1000)));
+                     + value.tv_usec * TimeSpan.TicksPerMicrosecond));
 
     public override string ToString() => ((TimeSpan)this).ToString();
 }

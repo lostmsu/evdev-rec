@@ -24,7 +24,7 @@ sealed class SyncWriter(EvdevCaptureOptions options, ILogger<SyncWriter> logger)
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         string syncPath = GetSyncPath(this.options);
 
-        var delta = TimeSpan.FromMinutes(-13); // force initial write
+        var delta = TimeSpan.Zero;
 
         await using var writer = new StreamWriter(syncPath, Utf8NoBom, new() {
             Mode = FileMode.CreateNew,

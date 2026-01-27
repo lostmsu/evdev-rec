@@ -20,6 +20,14 @@ sealed record EvdevInputId
     public ushort Version { get; init; }
 }
 
+public enum Clock: int {
+    CLOCK_REALTIME = 0,
+    CLOCK_MONOTONIC = 1,
+    CLOCK_MONOTONIC_RAW = 4,
+    BLOCK_BOOTTIME = 7,
+    CLOCK_TAI = 11,
+}
+
 static class EvdevIoctl
 {
     // Based on linux/input.h and asm-generic/ioctl.h
@@ -39,15 +47,20 @@ static class EvdevIoctl
     private const int IOC_READ = 2;
 
     static ulong IOC(int dir, int type, int nr, int size)
-        => (ulong)((dir << IOC_DIRSHIFT) | (type << IOC_TYPESHIFT) | (nr << IOC_NRSHIFT) | (size << IOC_SIZESHIFT));
+        => ((ulong)dir << IOC_DIRSHIFT)
+         | ((ulong)type << IOC_TYPESHIFT)
+         | ((ulong)nr << IOC_NRSHIFT)
+         | ((ulong)size << IOC_SIZESHIFT);
 
     static ulong IoctlRead(int type, int nr, int size) => IOC(IOC_READ, type, nr, size);
+    static ulong IoctlWrite(int type, int nr, int size) => IOC(IOC_WRITE, type, nr, size);
 
     private const int EVIOCGVERSION = 0x01;
     private const int EVIOCGID = 0x02;
     private const int EVIOCGNAME = 0x06;
     private const int EVIOCGPHYS = 0x07;
     private const int EVIOCGUNIQ = 0x08;
+    private const int EVIOCSCLOCKID = 0xA0;
 
     public static EvdevMetadata TryGetMetadata(int fd)
     {
@@ -61,6 +74,20 @@ static class EvdevIoctl
         };
 
         return metadata;
+    }
+
+    public static bool TrySetClockId(int fd, Clock clock, out int errno) {
+        unsafe {
+            int value = (int)clock;
+            int rc = ioctl(fd, IoctlWrite('E', EVIOCSCLOCKID, sizeof(int)), new IntPtr(&value));
+            if (rc == 0) {
+                errno = 0;
+                return true;
+            }
+
+            errno = Marshal.GetLastWin32Error();
+            return false;
+        }
     }
 
     static int? TryGetInt(int fd, ulong request)

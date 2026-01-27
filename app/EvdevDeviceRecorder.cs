@@ -38,6 +38,15 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
         this.inputIndex = ParseInputIndex(this.DevicePath);
         this.fd = SafeFd.OpenReadNonBlocking(this.DevicePath, this.logger);
         try {
+            if (EvdevIoctl.TrySetClockId(this.fd.Value, Clock.CLOCK_REALTIME, out int errno)) {
+                this.logger.LogDebug("Set evdev clock to CLOCK_REALTIME for {DevicePath}",
+                                     this.DevicePath);
+            } else {
+                this.logger.LogWarning(
+                    "Unable to set CLOCK_REALTIME for {DevicePath} (errno {Errno}); continuing",
+                    this.DevicePath, errno);
+            }
+
             this.metadata = EvdevIoctl.TryGetMetadata(this.fd.Value);
         } catch {
             this.fd.Dispose();
@@ -94,7 +103,8 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
                 this.IsEmpty = false;
                 if (segment is not null
                  && DateTimeOffset.UtcNow - segmentStart >= this.options.SegmentDuration) {
-                    this.logger.LogInformation("Committing segment for {DevicePath}", this.DevicePath);
+                    this.logger.LogInformation("Committing segment for {DevicePath}",
+                                               this.DevicePath);
                     CloseSegment(segment);
                     segment = null;
                 }
@@ -132,7 +142,8 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
             string suffix = attempt == 0
                 ? ""
                 : Invariant($"-{Environment.ProcessId:x}-{suffixCounter:x}");
-            string dataPath = Path.Combine(this.options.OutputDirectory, baseName + suffix + ".zst");
+            string dataPath =
+                Path.Combine(this.options.OutputDirectory, baseName + suffix + ".zst");
             string metaPath =
                 Path.Combine(this.options.OutputDirectory, baseName + suffix + ".meta.json");
 
