@@ -12,6 +12,7 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
     static long collisionSuffixCounter;
 
     public string DevicePath { get; }
+    public bool IsEmpty { get; private set; } = true;
 
     readonly EvdevCaptureOptions options;
 
@@ -71,6 +72,9 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
         byte[] buffer = new byte[eventSize * 1024];
 
         DateTimeOffset segmentStart = default;
+        var stopwatch = Stopwatch.StartNew();
+        var lastFlushTime = TimeSpan.FromMinutes(-13);
+        var lastFlush = Task.CompletedTask;
         CompressionStream? segment = null;
 
         try {
@@ -87,6 +91,7 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
                     throw new InvalidProgramException(
                         "Partial input_event read from evdev device.");
 
+                this.IsEmpty = false;
                 if (segment is not null
                  && DateTimeOffset.UtcNow - segmentStart >= this.options.SegmentDuration) {
                     this.logger.LogInformation("Committing segment for {DevicePath}", this.DevicePath);
@@ -99,9 +104,16 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
                     segment = this.OpenNewSegment(segmentStart, libinputText);
                 }
 
+                lastFlush.GetAwaiter().GetResult();
                 segment.Write(bytes);
+                if (stopwatch.Elapsed - lastFlushTime >= TimeSpan.FromSeconds(15)) {
+                    #warning does't actually flush https://github.com/oleg-st/ZstdSharp/issues/66
+                    lastFlush = segment.FlushAsync();
+                    lastFlushTime = stopwatch.Elapsed;
+                }
             }
         } finally {
+            lastFlush.GetAwaiter().GetResult();
             if (segment is not null)
                 CloseSegment(segment);
         }

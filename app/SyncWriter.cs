@@ -24,7 +24,7 @@ sealed class SyncWriter(EvdevCaptureOptions options, ILogger<SyncWriter> logger)
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
         string syncPath = GetSyncPath(this.options);
 
-        var delta = TimeSpan.Zero;
+        var delta = TimeSpan.FromMinutes(-13); // force initial write
 
         await using var writer = new StreamWriter(syncPath, Utf8NoBom, new() {
             Mode = FileMode.CreateNew,
@@ -32,10 +32,10 @@ sealed class SyncWriter(EvdevCaptureOptions options, ILogger<SyncWriter> logger)
             Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             Share = FileShare.Read,
         });
-        await writer.WriteLineAsync("event_ts_microsec\tunix_time_microsec\n").ConfigureAwait(false);
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        await writer.WriteLineAsync("event_ts_microsec\tunix_time_microsec").ConfigureAwait(false);
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
         try {
-            while (await timer.WaitForNextTickAsync(stoppingToken)) {
+            while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false)) {
                 var newTimestamp = TimeSpan.FromTicks(Interlocked.Read(ref this.lastTimestampTicks));
                 var updatedDelta = TimeSpan.FromTicks(Interlocked.Read(ref this.newDelta));
                 if (Math.Abs((delta - updatedDelta).TotalMilliseconds) < 20)
@@ -46,8 +46,9 @@ sealed class SyncWriter(EvdevCaptureOptions options, ILogger<SyncWriter> logger)
                 var sinceUnixEpoch = time - DateTimeOffset.UnixEpoch;
                 long tsMicrosec = newTimestamp.Ticks / TimeSpan.TicksPerMicrosecond;
                 long unixMicrosec = sinceUnixEpoch.Ticks / TimeSpan.TicksPerMicrosecond;
-                string line = Invariant($"{tsMicrosec}\t{unixMicrosec}\n");
+                string line = Invariant($"{tsMicrosec}\t{unixMicrosec}");
                 await writer.WriteLineAsync(line.AsMemory(), stoppingToken).ConfigureAwait(false);
+                await writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
             }
         } catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { } catch
             (Exception ex) {

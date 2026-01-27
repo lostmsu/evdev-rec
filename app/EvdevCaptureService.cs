@@ -60,7 +60,8 @@ sealed class EvdevCaptureService(
             await Task.WhenAll(this.recorders.Values.Select(async r => {
                 logger.LogDebug("Stopping recorder for {DevicePath}", r.DevicePath);
                 await r.DisposeAsync().ConfigureAwait(false);
-                logger.LogInformation("Stopped recorder for {DevicePath}", r.DevicePath);
+                var level = r.IsEmpty ? LogLevel.Debug : LogLevel.Information;
+                logger.Log(level, "Stopped recorder for {DevicePath}", r.DevicePath);
             }));
             this.recorders.Clear();
         }
