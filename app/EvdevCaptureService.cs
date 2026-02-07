@@ -130,6 +130,7 @@ sealed class EvdevCaptureService(
                 goto retry;
             }
 
+            recorder.Stopped += r => this.OnRecorderStopped(devicePath, r);
             recorder.OnEvents += (_, events) => { syncWriter.NotifyEvent(events[^1].time); };
         } catch (Exception ex) {
             logger.LogWarning(ex, "Unable to initialize recorder for {DevicePath}", devicePath);
@@ -148,5 +149,23 @@ sealed class EvdevCaptureService(
         if (wasRemoved)
             await recorder.DisposeAsync().ConfigureAwait(false);
         return wasRemoved;
+    }
+
+    void OnRecorderStopped(string devicePath, EvdevDeviceRecorder recorder) {
+        try {
+            if (!this.recorders.TryRemove(new(devicePath, recorder)))
+                return;
+
+            Task.Run(async () => {
+                try {
+                    await recorder.DisposeAsync().ConfigureAwait(false);
+                } catch (Exception ex) {
+                    logger.LogDebug(ex, "Error disposing stopped recorder for {DevicePath}",
+                                    devicePath);
+                }
+            });
+        } catch (Exception ex) {
+            logger.LogDebug(ex, "Error handling stopped recorder for {DevicePath}", devicePath);
+        }
     }
 }

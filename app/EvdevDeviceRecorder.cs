@@ -24,6 +24,7 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
     readonly CancellationTokenSource stop = new();
     readonly int inputIndex;
     readonly Task running;
+    int stoppedRaised;
 
     public EvdevDeviceRecorder(string devicePath,
                                EvdevCaptureOptions options,
@@ -57,6 +58,7 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
     }
 
     public event Action<EvdevDeviceRecorder, ReadOnlySpan<input_event>>? OnEvents;
+    public event Action<EvdevDeviceRecorder>? Stopped;
 
     async Task RunAsync() {
         if (nint.Size != 8)
@@ -126,7 +128,16 @@ sealed class EvdevDeviceRecorder: IAsyncDisposable {
             lastFlush.GetAwaiter().GetResult();
             if (segment is not null)
                 CloseSegment(segment);
+
+            if (!this.stop.IsCancellationRequested)
+                this.RaiseStopped();
         }
+    }
+
+    void RaiseStopped() {
+        if (Interlocked.Exchange(ref this.stoppedRaised, 1) != 0)
+            return;
+        this.Stopped?.Invoke(this);
     }
 
     CompressionStream OpenNewSegment(DateTimeOffset segmentStart, string? libinputText) {
